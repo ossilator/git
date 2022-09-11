@@ -5852,12 +5852,9 @@ static void todo_list_to_strbuf(struct repository *r, struct todo_list *todo_lis
 			if (item->command == TODO_FIXUP) {
 				if (item->flags & TODO_EDIT_FIXUP_MSG)
 					strbuf_addstr(buf, " -c");
-				else if (item->flags & TODO_REPLACE_FIXUP_MSG) {
+				else if (item->flags & TODO_REPLACE_FIXUP_MSG)
 					strbuf_addstr(buf, " -C");
-				}
-			}
-
-			if (item->command == TODO_MERGE) {
+			} else if (item->command == TODO_MERGE) {
 				if (item->flags & TODO_EDIT_MERGE_MSG)
 					strbuf_addstr(buf, " -c");
 				else
