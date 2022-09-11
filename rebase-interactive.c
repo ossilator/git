@@ -35,7 +35,7 @@ static enum missing_commit_check_level get_missing_commit_check_level(void)
 	return MISSING_COMMIT_CHECK_IGNORE;
 }
 
-void append_todo_help(int command_count,
+void append_todo_help(int command_count, enum rebase_action action,
 		      const char *shortrevisions, const char *shortonto,
 		      struct strbuf *buf)
 {
@@ -62,9 +62,8 @@ void append_todo_help(int command_count,
 "                      updated at the end of the rebase\n"
 "\n"
 "These lines can be re-ordered; they are executed from top to bottom.\n");
-	unsigned edit_todo = !(shortrevisions && shortonto);
 
-	if (!edit_todo) {
+	if (action == ACTION_NONE) {
 		strbuf_addch(buf, '\n');
 		strbuf_commented_addf(buf, Q_("Rebase %s onto %s (%d command)",
 					      "Rebase %s onto %s (%d commands)",
@@ -83,7 +82,7 @@ void append_todo_help(int command_count,
 
 	strbuf_add_commented_lines(buf, msg, strlen(msg));
 
-	if (edit_todo)
+	if (action == ACTION_EDIT_TODO)
 		msg = _("\nYou are editing the todo file "
 			"of an ongoing interactive rebase.\n"
 			"To continue rebase after editing, run:\n"
@@ -97,35 +96,37 @@ void append_todo_help(int command_count,
 
 int edit_todo_list(struct repository *r, struct todo_list *todo_list,
 		   struct todo_list *new_todo, const char *shortrevisions,
-		   const char *shortonto, unsigned flags)
+		   const char *shortonto, unsigned flags,
+		   enum rebase_action action)
 {
 	const char *todo_file = rebase_path_todo(),
 		*todo_backup = rebase_path_todo_backup();
-	unsigned initial = shortrevisions && shortonto;
 	int incorrect = 0;
 
 	/* If the user is editing the todo list, we first try to parse
 	 * it.  If there is an error, we do not return, because the user
 	 * might want to fix it in the first place. */
-	if (!initial)
+	if (action != ACTION_NONE)
 		incorrect = todo_list_parse_insn_buffer(r, todo_list->buf.buf, todo_list) |
 			file_exists(rebase_path_dropped());
 
 	if (todo_list_write_to_file(r, todo_list, todo_file, shortrevisions, shortonto,
-				    -1, flags | TODO_LIST_SHORTEN_IDS | TODO_LIST_APPEND_TODO_HELP))
+				    -1, flags | TODO_LIST_SHORTEN_IDS | TODO_LIST_APPEND_TODO_HELP,
+				    action))
 		return error_errno(_("could not write '%s'"), todo_file);
 
 	if (!incorrect &&
 	    todo_list_write_to_file(r, todo_list, todo_backup,
 				    shortrevisions, shortonto, -1,
-				    (flags | TODO_LIST_APPEND_TODO_HELP) & ~TODO_LIST_SHORTEN_IDS) < 0)
+				    (flags | TODO_LIST_APPEND_TODO_HELP) & ~TODO_LIST_SHORTEN_IDS,
+				    action) < 0)
 		return error(_("could not write '%s'."), rebase_path_todo_backup());
 
 	if (launch_sequence_editor(todo_file, &new_todo->buf, NULL))
 		return -2;
 
 	strbuf_stripspace(&new_todo->buf, 1);
-	if (initial && new_todo->buf.len == 0)
+	if (action != ACTION_EDIT_TODO && new_todo->buf.len == 0)
 		return -3;
 
 	if (todo_list_parse_insn_buffer(r, new_todo->buf.buf, new_todo)) {

@@ -5875,14 +5875,15 @@ static void todo_list_to_strbuf(struct repository *r, struct todo_list *todo_lis
 
 int todo_list_write_to_file(struct repository *r, struct todo_list *todo_list,
 			    const char *file, const char *shortrevisions,
-			    const char *shortonto, int num, unsigned flags)
+			    const char *shortonto, int num, unsigned flags,
+			    enum rebase_action action)
 {
 	int res;
 	struct strbuf buf = STRBUF_INIT;
 
 	todo_list_to_strbuf(r, todo_list, &buf, num, flags);
 	if (flags & TODO_LIST_APPEND_TODO_HELP)
-		append_todo_help(count_commands(todo_list),
+		append_todo_help(count_commands(todo_list), action,
 				 shortrevisions, shortonto, &buf);
 
 	res = write_message(buf.buf, buf.len, file, 0);
@@ -5922,7 +5923,8 @@ static int skip_unnecessary_picks(struct repository *r,
 	if (i > 0) {
 		const char *done_path = rebase_path_done();
 
-		if (todo_list_write_to_file(r, todo_list, done_path, NULL, NULL, i, 0)) {
+		if (todo_list_write_to_file(r, todo_list, done_path, NULL, NULL, i, 0,
+					    ACTION_NONE)) {
 			error_errno(_("could not write to '%s'"), done_path);
 			return -1;
 		}
@@ -6067,8 +6069,8 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 		    const char *shortrevisions, const char *onto_name,
 		    struct commit *onto, const struct object_id *orig_head,
 		    struct string_list *commands, unsigned autosquash,
-		    unsigned update_refs,
-		    struct todo_list *todo_list)
+		    unsigned update_refs, struct todo_list *todo_list,
+		    enum rebase_action action)
 {
 	char shortonto[GIT_MAX_HEXSZ + 1];
 	const char *todo_file = rebase_path_todo();
@@ -6103,7 +6105,7 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 	}
 
 	res = edit_todo_list(r, todo_list, &new_todo, shortrevisions,
-			     shortonto, flags);
+			     shortonto, flags, action);
 	if (res == -1)
 		return -1;
 	else if (res == -2) {
@@ -6139,7 +6141,7 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 	}
 
 	if (todo_list_write_to_file(r, &new_todo, todo_file, NULL, NULL, -1,
-				    flags & ~(TODO_LIST_SHORTEN_IDS))) {
+				    flags & ~(TODO_LIST_SHORTEN_IDS), action)) {
 		todo_list_release(&new_todo);
 		return error_errno(_("could not write '%s'"), todo_file);
 	}

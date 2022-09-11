@@ -4,6 +4,7 @@
 #include "strbuf.h"
 #include "wt-status.h"
 
+enum rebase_action;
 struct commit;
 struct index_state;
 struct repository;
@@ -134,7 +135,8 @@ int todo_list_parse_insn_buffer(struct repository *r, char *buf,
 				struct todo_list *todo_list);
 int todo_list_write_to_file(struct repository *r, struct todo_list *todo_list,
 			    const char *file, const char *shortrevisions,
-			    const char *shortonto, int num, unsigned flags);
+			    const char *shortonto, int num, unsigned flags,
+			    enum rebase_action action);
 void todo_list_release(struct todo_list *todo_list);
 const char *todo_item_get_arg(struct todo_list *todo_list,
 			      struct todo_item *item);
@@ -187,8 +189,8 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 		    const char *shortrevisions, const char *onto_name,
 		    struct commit *onto, const struct object_id *orig_head,
 		    struct string_list *commands, unsigned autosquash,
-		    unsigned update_refs,
-		    struct todo_list *todo_list);
+		    unsigned update_refs, struct todo_list *todo_list,
+		    enum rebase_action action);
 int todo_list_rearrange_squash(struct todo_list *todo_list);
 
 /*

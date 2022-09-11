@@ -58,16 +58,6 @@ enum empty_type {
 	EMPTY_ASK
 };
 
-enum action {
-	ACTION_NONE = 0,
-	ACTION_CONTINUE,
-	ACTION_SKIP,
-	ACTION_ABORT,
-	ACTION_QUIT,
-	ACTION_EDIT_TODO,
-	ACTION_SHOW_CURRENT_PATCH
-};
-
 static const char *action_names[] = {
 	"undefined",
 	"continue",
@@ -104,7 +94,7 @@ struct rebase_options {
 		REBASE_INTERACTIVE_EXPLICIT = 1<<4,
 	} flags;
 	struct strvec git_am_opts;
-	enum action action;
+	enum rebase_action action;
 	char *reflog_action;
 	int signoff;
 	int allow_rerere_autoupdate;
@@ -198,9 +188,11 @@ static int edit_todo_file(unsigned flags)
 		return error_errno(_("could not read '%s'."), todo_file);
 
 	strbuf_stripspace(&todo_list.buf, 1);
-	res = edit_todo_list(the_repository, &todo_list, &new_todo, NULL, NULL, flags);
+	res = edit_todo_list(the_repository, &todo_list, &new_todo, NULL, NULL, flags,
+			     ACTION_EDIT_TODO);
 	if (!res && todo_list_write_to_file(the_repository, &new_todo, todo_file,
-					    NULL, NULL, -1, flags & ~(TODO_LIST_SHORTEN_IDS)))
+					    NULL, NULL, -1, flags & ~(TODO_LIST_SHORTEN_IDS),
+					    ACTION_EDIT_TODO))
 		res = error_errno(_("could not write '%s'"), todo_file);
 
 	todo_list_release(&todo_list);
@@ -294,7 +286,8 @@ static int do_interactive_rebase(struct rebase_options *opts, unsigned flags)
 		ret = complete_action(the_repository, &replay, flags,
 			shortrevisions, opts->onto_name, opts->onto,
 			&opts->orig_head->object.oid, &opts->exec,
-			opts->autosquash, opts->update_refs, &todo_list);
+			opts->autosquash, opts->update_refs, &todo_list,
+			opts->action);
 	}
 
 cleanup:
@@ -1246,7 +1239,9 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 		else if (options.exec.nr)
 			trace2_cmd_mode("interactive-exec");
 		else
-			trace2_cmd_mode(action_names[options.action]);
+			trace2_cmd_mode(
+				(BUILD_ASSERT_OR_ZERO(ARRAY_SIZE(action_names) == ACTION_LAST),
+				 action_names[options.action]));
 	}
 
 	options.reflog_action = getenv(GIT_REFLOG_ACTION_ENVIRONMENT);
