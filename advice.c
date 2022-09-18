@@ -192,7 +192,7 @@ int error_resolve_conflict(const char *me)
 		error(_("Reverting is not possible because you have unmerged files."));
 	else
 		error(_("It is not possible to %s because you have unmerged files."),
-			me);
+			_(me));
 
 	if (advice_enabled(ADVICE_RESOLVE_CONFLICT))
 		/*
