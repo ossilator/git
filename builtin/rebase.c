@@ -462,6 +462,7 @@ static const char *state_dir_path(const char *filename, struct rebase_options *o
 }
 
 /* Initialize the rebase options from the state directory. */
+// FIXME: this is partly redundant with the sequencer's read_populate_opts().
 static int read_basic_state(struct rebase_options *opts)
 {
 	struct strbuf head_name = STRBUF_INIT;
@@ -556,6 +557,7 @@ static int read_basic_state(struct rebase_options *opts)
 	return 0;
 }
 
+// This is written only by the apply backend
 static int rebase_write_basic_state(struct rebase_options *opts)
 {
 	write_file(state_dir_path("head-name", opts), "%s",
