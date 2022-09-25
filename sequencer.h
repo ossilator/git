@@ -188,7 +188,7 @@ int sequencer_make_script(struct repository *r, struct strbuf *out, int argc,
 
 int complete_action(struct repository *r, struct replay_opts *opts, unsigned flags,
 		    const char *shortrevisions, const char *onto_name,
-		    struct commit *onto, const struct object_id *orig_head,
+		    const struct object_id *onto, const struct object_id *orig_head,
 		    struct string_list *commands, unsigned autosquash,
 		    unsigned update_refs, struct todo_list *todo_list,
 		    enum rebase_action action);

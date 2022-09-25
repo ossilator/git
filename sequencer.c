@@ -2083,7 +2083,7 @@ static void flush_rewritten_pending(void)
 	strbuf_release(&buf);
 }
 
-static void record_in_rewritten(struct object_id *oid,
+static void record_in_rewritten(const struct object_id *oid,
 		enum todo_command next_command)
 {
 	FILE *out = fopen_or_warn(rebase_path_rewritten_pending(), "a");
@@ -5899,7 +5899,7 @@ int todo_list_write_to_file(struct repository *r, struct todo_list *todo_list,
 /* skip picking commits whose parents are unchanged */
 static int skip_unnecessary_picks(struct repository *r,
 				  struct todo_list *todo_list,
-				  struct object_id *base_oid)
+				  const struct object_id **base_oid)
 {
 	struct object_id *parent_oid;
 	int i;
@@ -5920,9 +5920,9 @@ static int skip_unnecessary_picks(struct repository *r,
 		if (item->commit->parents->next)
 			break; /* merge commit */
 		parent_oid = &item->commit->parents->item->object.oid;
-		if (!oideq(parent_oid, base_oid))
+		if (!oideq(parent_oid, *base_oid))
 			break;
-		oidcpy(base_oid, &item->commit->object.oid);
+		*base_oid = &item->commit->object.oid;
 	}
 	if (i > 0) {
 		const char *done_path = rebase_path_done();
@@ -5939,7 +5939,7 @@ static int skip_unnecessary_picks(struct repository *r,
 		todo_list->done_nr += i;
 
 		if (is_fixup(peek_command(todo_list, 0)))
-			record_in_rewritten(base_oid, peek_command(todo_list, 0));
+			record_in_rewritten(*base_oid, peek_command(todo_list, 0));
 	}
 
 	return 0;
@@ -6071,7 +6071,7 @@ static int todo_list_add_update_ref_commands(struct todo_list *todo_list)
 
 int complete_action(struct repository *r, struct replay_opts *opts, unsigned flags,
 		    const char *shortrevisions, const char *onto_name,
-		    struct commit *onto, const struct object_id *orig_head,
+		    const struct object_id *onto, const struct object_id *orig_head,
 		    struct string_list *commands, unsigned autosquash,
 		    unsigned update_refs, struct todo_list *todo_list,
 		    enum rebase_action action)
@@ -6080,10 +6080,9 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 	const char *todo_file = rebase_path_todo();
 	struct todo_list new_todo = TODO_LIST_INIT;
 	struct strbuf *buf = &todo_list->buf, buf2 = STRBUF_INIT;
-	struct object_id oid = onto->object.oid;
 	int res;
 
-	find_unique_abbrev_r(shortonto, &oid, DEFAULT_ABBREV);
+	find_unique_abbrev_r(shortonto, onto, DEFAULT_ABBREV);
 
 	if (buf->len == 0) {
 		struct todo_item *item = append_new_todo(todo_list);
@@ -6124,7 +6123,7 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 
 		return error(_("nothing to do"));
 	} else if (res == EDIT_TODO_INCORRECT) {
-		checkout_onto(r, opts, onto_name, &onto->object.oid, orig_head);
+		checkout_onto(r, opts, onto_name, onto, orig_head);
 		todo_list_release(&new_todo);
 
 		return -1;
@@ -6139,7 +6138,7 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 		BUG("invalid todo list after expanding IDs:\n%s",
 		    new_todo.buf.buf);
 
-	if (opts->allow_ff && skip_unnecessary_picks(r, &new_todo, &oid)) {
+	if (opts->allow_ff && skip_unnecessary_picks(r, &new_todo, &onto)) {
 		todo_list_release(&new_todo);
 		return error(_("could not skip unnecessary pick commands"));
 	}
@@ -6152,7 +6151,7 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 
 	res = -1;
 
-	if (checkout_onto(r, opts, onto_name, &oid, orig_head))
+	if (checkout_onto(r, opts, onto_name, onto, orig_head))
 		goto cleanup;
 
 	if (require_clean_work_tree(r, "rebase", NULL, 1, 1))

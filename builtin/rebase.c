@@ -285,7 +285,7 @@ static int do_interactive_rebase(struct rebase_options *opts, unsigned flags)
 			BUG("unusable todo list");
 
 		ret = complete_action(the_repository, &replay, flags,
-			shortrevisions, opts->onto_name, opts->onto,
+			shortrevisions, opts->onto_name, &opts->onto->object.oid,
 			&opts->orig_head->object.oid, &opts->exec,
 			opts->autosquash, opts->update_refs, &todo_list,
 			opts->action);
