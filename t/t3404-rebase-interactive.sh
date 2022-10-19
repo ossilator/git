@@ -2180,6 +2180,117 @@ test_expect_success 'bad labels and refs rejected when parsing todo list' '
 	test_path_is_missing execed
 '
 
+test_expect_success 'rebase --rewind' '
+	git checkout primary^0 &&
+	(
+		set_fake_editor &&
+		FAKE_LINES="1 reword 2 3 break 4" \
+			FAKE_COMMIT_MESSAGE="C_reworded" \
+			git rebase -i HEAD~4 &&
+		FAKE_LINES="reword 1 2 3 6" \
+			FAKE_COMMIT_MESSAGE="B_reworded" \
+			git rebase --rewind >output 2>&1
+	) &&
+	grep -q "Rebasing (4/4)" output &&
+	test "$(git log -1 --format=%B HEAD~3)" = "B_reworded" &&
+	test "$(git log -1 --format=%B HEAD~2)" = "C_reworded"
+'
+
+test_expect_success 'rebase --rewind with initially botched todo' '
+	git checkout primary^0 &&
+	(
+		set_fake_editor &&
+		FAKE_LINES="1 reword 2 3 break 4" \
+			FAKE_COMMIT_MESSAGE="C_reworded" \
+			git rebase -i HEAD~4 &&
+		test_must_fail env FAKE_LINES="reword 1 bad 2 3 6" \
+			git rebase --rewind &&
+		grep -q "rewinding" < .git/rebase-merge/git-rebase-todo.backup &&
+		FAKE_LINES="reword 1 pick 2 3 4" \
+			git rebase --edit-todo &&
+		FAKE_COMMIT_MESSAGE="B_reworded" \
+			git rebase --continue
+	) &&
+	test "$(git log -1 --format=%B HEAD~3)" = "B_reworded" &&
+	test "$(git log -1 --format=%B HEAD~2)" = "C_reworded"
+'
+
+test_expect_success 'recursing rebase --rewind with initially botched todo' '
+	git checkout primary^0 &&
+	cat >expect <<-\EOF &&
+	error: you are already rewinding a rebase.
+	Use rebase --edit-todo to continue.
+	EOF
+	(
+		set_fake_editor &&
+		FAKE_LINES="1 reword 2 3 break 4" \
+			FAKE_COMMIT_MESSAGE="C_reworded" \
+			git rebase -i HEAD~4 &&
+		test_must_fail env FAKE_LINES="reword 1 bad 2 3 6" \
+			git rebase --rewind &&
+		test_must_fail env FAKE_LINES="reword 1 pick 2 3 4" \
+			git rebase --rewind >actual 2>&1  &&
+		test_cmp expect actual &&
+		git rebase --abort
+	)
+'
+
+test_expect_success 'rebase --rewind being aborted' '
+	git checkout primary^0 &&
+	cat >expect <<-\EOF &&
+	error: rewind aborted; state unchanged
+	EOF
+	(
+		set_fake_editor &&
+		FAKE_LINES="1 reword 2 3 break 4" \
+			FAKE_COMMIT_MESSAGE="C_reworded" \
+			git rebase -i HEAD~4 &&
+		test_must_fail env FAKE_LINES="#" \
+			git rebase --rewind >output 2>&1 &&
+		tail -n 1 output >actual &&  # Ignore output about changing todo list
+		test_cmp expect actual &&
+		git rebase --continue
+	) &&
+	test "$(git log -1 --format=%B HEAD~2)" = "C_reworded"
+'
+
+test_expect_success 'rebase --rewind being aborted after initially botched todo' '
+	git checkout primary^0 &&
+	cat >expect <<-\EOF &&
+	error: rewind aborted; state restored
+	EOF
+	(
+		set_fake_editor &&
+		FAKE_LINES="1 reword 2 3 break 4" \
+			FAKE_COMMIT_MESSAGE="C_reworded" \
+			git rebase -i HEAD~4 &&
+		test_must_fail env FAKE_LINES="reword 1 bad 2 3 6" \
+			git rebase --rewind &&
+		test_must_fail env FAKE_LINES="#" \
+			git rebase --edit-todo >output 2>&1 &&
+		tail -n 1 output >actual &&  # Ignore output about changing todo list
+		test_cmp expect actual &&
+		git rebase --continue
+	) &&
+	test "$(git log -1 --format=%B HEAD~2)" = "C_reworded"
+'
+
+test_expect_failure 'rebase --rewind vs. --update-refs' '
+	git checkout primary^0 &&
+	git branch -f first HEAD~3 &&
+	(
+		set_fake_editor &&
+		FAKE_LINES="1 2 reword 4 5 break 6 7" \
+			FAKE_COMMIT_MESSAGE="C_reworded" \
+			git rebase -i --update-refs HEAD~4 &&
+		FAKE_LINES="reword 1 2 3 4 7 8" \
+			FAKE_COMMIT_MESSAGE="B_reworded" \
+			git rebase --rewind
+	) &&
+	test_cmp_rev HEAD~3 refs/heads/first &&
+	test_cmp_rev HEAD refs/heads/primary
+'
+
 # This must be the last test in this file
 test_expect_success '$EDITOR and friends are unchanged' '
 	test_editor_unchanged

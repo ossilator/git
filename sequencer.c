@@ -62,6 +62,7 @@ static GIT_PATH_FUNC(rebase_path, "rebase-merge")
  */
 GIT_PATH_FUNC(rebase_path_todo, "rebase-merge/git-rebase-todo")
 GIT_PATH_FUNC(rebase_path_todo_backup, "rebase-merge/git-rebase-todo.backup")
+GIT_PATH_FUNC(rebase_path_todo_orig, "rebase-merge/git-rebase-todo.orig")
 
 GIT_PATH_FUNC(rebase_path_dropped, "rebase-merge/dropped")
 
@@ -70,7 +71,8 @@ GIT_PATH_FUNC(rebase_path_dropped, "rebase-merge/dropped")
  * is moved here when it is first handled, before any associated user
  * actions.
  */
-static GIT_PATH_FUNC(rebase_path_done, "rebase-merge/done")
+GIT_PATH_FUNC(rebase_path_done, "rebase-merge/done")
+GIT_PATH_FUNC(rebase_path_done_orig, "rebase-merge/done.orig")
 /*
  * The file to keep track of how many commands were already processed (e.g.
  * for the prompt).
@@ -6094,7 +6096,10 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 	struct strbuf *buf = &todo_list->buf;
 	int res;
 
-	find_unique_abbrev_r(shortonto, onto, DEFAULT_ABBREV);
+	if (action == ACTION_NONE)
+		find_unique_abbrev_r(shortonto, onto, DEFAULT_ABBREV);
+	else if (read_populate_opts(opts))
+		return -1;
 
 	if (buf->len == 0) {
 		struct todo_item *item = append_new_todo(todo_list);
@@ -6124,11 +6129,20 @@ int complete_action(struct repository *r, struct replay_opts *opts, unsigned fla
 	if (res == EDIT_TODO_IOERROR)
 		return -1;
 	else if (res == EDIT_TODO_FAILED) {
+		if (action == ACTION_REWIND)
+			return -1;
+
 		apply_autostash(rebase_path_autostash());
 		sequencer_remove_state(opts);
 
 		return -1;
 	} else if (res == EDIT_TODO_ABORT) {
+		if (action == ACTION_REWIND) {
+			todo_list_release(&new_todo);
+
+			return error(_("rewind aborted; state unchanged"));
+		}
+
 		apply_autostash(rebase_path_autostash());
 		sequencer_remove_state(opts);
 		todo_list_release(&new_todo);
@@ -6220,7 +6234,7 @@ static int skip_fixupish(const char *subject, const char **p) {
 int todo_list_rearrange_squash(struct todo_list *todo_list)
 {
 	struct hashmap subject2item;
-	int rearranged = 0, *next, *tail, i, nr = 0;
+	int rearranged = 0, *next, *tail, i, j, nr = 0;
 	char **subjects;
 	struct commit_todo_item commit_todo;
 	struct todo_item *items = NULL;
@@ -6246,6 +6260,10 @@ int todo_list_rearrange_squash(struct todo_list *todo_list)
 		size_t subject_len;
 		int i2 = -1;
 		struct subject2item_entry *entry;
+
+		// When rewinding, process only up to the marker.
+		if (item->command == TODO_BREAK)
+			break;
 
 		next[i] = tail[i] = -1;
 		if (!item->commit || item->command == TODO_DROP) {
@@ -6331,9 +6349,9 @@ int todo_list_rearrange_squash(struct todo_list *todo_list)
 	if (rearranged) {
 		items = ALLOC_ARRAY(items, todo_list->nr);
 
-		for (i = 0; i < todo_list->nr; i++) {
-			enum todo_command command = todo_list->items[i].command;
-			int cur = i;
+		for (j = 0; j < i; j++) {
+			enum todo_command command = todo_list->items[j].command;
+			int cur = j;
 
 			/*
 			 * Initially, all commands are 'pick's. If it is a
@@ -6348,6 +6366,9 @@ int todo_list_rearrange_squash(struct todo_list *todo_list)
 			}
 		}
 
+		for (; j < todo_list->nr; j++)
+			items[nr++] = todo_list->items[j];
+
 		assert(nr == todo_list->nr);
 		todo_list->alloc = nr;
 		FREE_AND_NULL(todo_list->items);
@@ -6356,8 +6377,8 @@ int todo_list_rearrange_squash(struct todo_list *todo_list)
 
 	free(next);
 	free(tail);
-	for (i = 0; i < todo_list->nr; i++)
-		free(subjects[i]);
+	for (j = 0; j < i; j++)
+		free(subjects[j]);
 	free(subjects);
 	hashmap_clear_and_free(&subject2item, struct subject2item_entry, entry);
 

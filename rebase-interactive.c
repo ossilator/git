@@ -87,6 +87,16 @@ void append_todo_help(int command_count, enum rebase_action action,
 			"of an ongoing interactive rebase.\n"
 			"To continue rebase after editing, run:\n"
 			"    git rebase --continue\n\n");
+	else if (action == ACTION_REWIND)
+		msg = _("\nYou are rewinding "
+			"an ongoing interactive rebase.\n"
+			"If you remove everything, "
+			"the todo file will be left unchanged.\n\n");
+	else if (action == ACTION_RESUME_REWIND)
+		msg = _("\nYou are correcting the rewind of "
+			"an ongoing interactive rebase.\n"
+			"If you remove everything, "
+			"the todo file will be restored.\n\n");
 	else
 		msg = _("\nHowever, if you remove everything, "
 			"the rebase will be aborted.\n\n");
@@ -101,8 +111,17 @@ enum edit_todo_result edit_todo_list(
 		   enum rebase_action action)
 {
 	const char *todo_file = rebase_path_todo(),
-		*todo_backup = rebase_path_todo_backup();
+		*todo_backup = rebase_path_todo_backup(),
+		*todo_file_orig = rebase_path_todo_orig(),
+		*done_file = rebase_path_done(),
+		*done_file_orig = rebase_path_done_orig();
 	int incorrect = 0;
+
+	if (action == ACTION_REWIND) {
+		if (rename(todo_file, todo_file_orig) ||
+		    rename(done_file, done_file_orig))
+			return error_errno(_("cannot displace todo file"));
+	}
 
 	/* If the user is editing the todo list, we first try to parse
 	 * it.  If there is an error, we do not return, because the user
@@ -127,8 +146,14 @@ enum edit_todo_result edit_todo_list(
 		return EDIT_TODO_FAILED;
 
 	strbuf_stripspace(&new_todo->buf, 1);
-	if (action != ACTION_EDIT_TODO && new_todo->buf.len == 0)
+	if (action != ACTION_EDIT_TODO && new_todo->buf.len == 0) {
+		if (action == ACTION_REWIND || action == ACTION_RESUME_REWIND) {
+			if (rename(todo_file_orig, todo_file) ||
+			    rename(done_file_orig, done_file))
+				return error_errno(_("cannot restore todo file"));
+		}
 		return EDIT_TODO_ABORT;
+	}
 
 	if (todo_list_parse_insn_buffer(r, new_todo->buf.buf, new_todo)) {
 		fprintf(stderr, _(edit_todo_list_advice));
@@ -146,6 +171,11 @@ enum edit_todo_result edit_todo_list(
 	} else if (todo_list_check(todo_list, new_todo)) {
 		write_file(rebase_path_dropped(), "%s", "");
 		return EDIT_TODO_INCORRECT;
+	}
+
+	if (action == ACTION_REWIND) {
+		unlink(todo_file_orig);
+		unlink(done_file_orig);
 	}
 
 	/*

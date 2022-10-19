@@ -12,7 +12,8 @@ SYNOPSIS
 	[--onto <newbase> | --keep-base] [<upstream> [<branch>]]
 'git rebase' [-i | --interactive] [<options>] [--exec <cmd>] [--onto <newbase>]
 	--root [<branch>]
-'git rebase' (--continue | --skip | --abort | --quit | --edit-todo | --show-current-patch)
+'git rebase' (--continue | --skip | --abort | --quit | --edit-todo | --rewind |
+	--show-current-patch)
 
 DESCRIPTION
 -----------
@@ -215,7 +216,8 @@ The options in this section cannot be used with any other option,
 including not with each other:
 
 --continue::
-	Restart the rebasing process after having resolved a merge conflict.
+	Restart the rebasing process after an interruption, e.g. having
+	resolved a merge conflict.
 
 --skip::
 	Restart the rebasing process by skipping the current patch.
@@ -235,6 +237,10 @@ including not with each other:
 
 --edit-todo::
 	Edit the todo list during an interactive rebase.
+
+--rewind::
+	Edit the todo list during an interactive rebase, but first
+	prepend the commits on top of the new base and reset to it.
 
 --show-current-patch::
 	Show the current patch in an interactive rebase or when rebase
@@ -974,6 +980,10 @@ exec make test
 pick f4593f9 four
 exec make test
 --------------------
+
+If during editing a commit you notice that an ancestor commit should be
+actually edited first, you may use `git rebase --rewind` to restart the
+interactive rebase without starting from scratch.
 
 SPLITTING COMMITS
 -----------------

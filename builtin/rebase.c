@@ -36,7 +36,8 @@ static char const * const builtin_rebase_usage[] = {
 		"[--onto <newbase> | --keep-base] [<upstream> [<branch>]]"),
 	N_("git rebase [-i] [options] [--exec <cmd>] [--onto <newbase>] "
 		"--root [<branch>]"),
-	"git rebase --continue | --abort | --skip | --edit-todo",
+	"git rebase --continue | --abort | --quit | --skip | --edit-todo | "
+		"--rewind",
 	NULL
 };
 
@@ -65,6 +66,8 @@ static const char *action_names[] = {
 	"abort",
 	"quit",
 	"edit_todo",
+	"rewind",
+	"resume_rewind",
 	"show_current_patch"
 };
 
@@ -183,6 +186,8 @@ static int edit_todo_file(unsigned flags)
 	const char *todo_file = rebase_path_todo();
 	struct todo_list todo_list = TODO_LIST_INIT,
 		new_todo = TODO_LIST_INIT;
+	enum rebase_action action = file_exists(rebase_path_todo_orig()) ?
+				ACTION_RESUME_REWIND : ACTION_EDIT_TODO;
 	int res = 0;
 
 	if (strbuf_read_file(&todo_list.buf, todo_file, 0) < 0)
@@ -190,10 +195,12 @@ static int edit_todo_file(unsigned flags)
 
 	strbuf_stripspace(&todo_list.buf, 1);
 	res = edit_todo_list(the_repository, &todo_list, &new_todo, NULL, NULL, flags,
-			     ACTION_EDIT_TODO);
-	if (!res && todo_list_write_to_file(the_repository, &new_todo, todo_file,
-					    NULL, NULL, -1, flags & ~(TODO_LIST_SHORTEN_IDS),
-					    ACTION_EDIT_TODO))
+			     action);
+	if (res == EDIT_TODO_ABORT)
+		res = error(_("rewind aborted; state restored"));
+	else if (!res && todo_list_write_to_file(the_repository, &new_todo, todo_file,
+						 NULL, NULL, -1,
+						 flags & ~(TODO_LIST_SHORTEN_IDS), action))
 		res = error_errno(_("could not write '%s'"), todo_file);
 
 	todo_list_release(&todo_list);
@@ -301,6 +308,64 @@ cleanup:
 	return ret;
 }
 
+static int rewind_todo_file(struct rebase_options *opts,
+			    unsigned flags)
+{
+	int ret;
+	char *revisions;
+	const char *todo_file = rebase_path_todo();
+	struct strvec make_script_args = STRVEC_INIT;
+	struct todo_list todo_list = TODO_LIST_INIT;
+	struct replay_opts replay = get_replay_opts(opts);
+	struct string_list commands = STRING_LIST_INIT_DUP;
+
+	require_clean_work_tree(the_repository,
+		N_("rewind rebase"),
+		_("Please commit or stash them."), 1, 0);
+
+	if (file_exists(rebase_path_todo_orig()))
+		return error(_("you are already rewinding a rebase.\n"
+			       "Use rebase --edit-todo to continue."));
+
+	revisions = xstrfmt("%s..HEAD", oid_to_hex(&opts->onto->object.oid));
+	strvec_pushl(&make_script_args, "", revisions, NULL);
+	free(revisions);
+
+	ret = sequencer_make_script(the_repository, &todo_list.buf,
+				    make_script_args.nr, make_script_args.v,
+				    flags);
+	strvec_clear(&make_script_args);
+
+	if (ret)
+		error(_("could not generate todo list"));
+	else {
+		if (flags & TODO_LIST_ABBREVIATE_CMDS)
+			strbuf_addstr(&todo_list.buf, "b\n\n");
+		else
+			strbuf_addstr(&todo_list.buf, "break\n\n");
+
+		if (strbuf_read_file(&todo_list.buf, todo_file, 0) < 0) {
+			strbuf_release(&todo_list.buf);
+			return error_errno(_("could not read '%s'."), todo_file);
+		}
+
+		discard_index(&the_index);
+		if (todo_list_parse_insn_buffer(the_repository, todo_list.buf.buf,
+						&todo_list))
+			BUG("unusable todo list");
+
+		ret = complete_action(the_repository, &replay, flags,
+			NULL, opts->onto_name, &opts->onto->object.oid,
+			&opts->orig_head->object.oid, &opts->exec,
+			opts->autosquash, opts->update_refs, &todo_list,
+			opts->action);
+	}
+
+	todo_list_release(&todo_list);
+
+	return ret;
+}
+
 static int run_sequencer_rebase(struct rebase_options *opts)
 {
 	unsigned flags = 0;
@@ -341,6 +406,9 @@ static int run_sequencer_rebase(struct rebase_options *opts)
 	}
 	case ACTION_EDIT_TODO:
 		ret = edit_todo_file(flags);
+		break;
+	case ACTION_REWIND:
+		ret = rewind_todo_file(opts, flags);
 		break;
 	case ACTION_SHOW_CURRENT_PATCH: {
 		struct child_process cmd = CHILD_PROCESS_INIT;
@@ -1088,6 +1156,8 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 			    N_("abort but keep HEAD where it is"), ACTION_QUIT),
 		OPT_CMDMODE(0, "edit-todo", &options.action, N_("edit the todo list "
 			    "during an interactive rebase"), ACTION_EDIT_TODO),
+		OPT_CMDMODE(0, "rewind", &options.action, N_("rewind an interactive "
+			    "rebase"), ACTION_REWIND),
 		OPT_CMDMODE(0, "show-current-patch", &options.action,
 			    N_("show the patch file being applied or merged"),
 			    ACTION_SHOW_CURRENT_PATCH),
@@ -1235,6 +1305,9 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 	if (options.action == ACTION_EDIT_TODO && !is_merge(&options))
 		die(_("The --edit-todo action can only be used during "
 		      "interactive rebase."));
+	else if (options.action == ACTION_REWIND && !is_merge(&options))
+		die(_("The --rewind action can only be used during "
+		      "interactive rebase."));
 
 	if (trace2_is_enabled()) {
 		if (is_merge(&options))
@@ -1339,6 +1412,10 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 	case ACTION_EDIT_TODO:
 		options.dont_finish_rebase = 1;
 		goto run_rebase;
+	case ACTION_REWIND:
+		if (read_basic_state(&options))
+			exit(1);
+		break;
 	case ACTION_SHOW_CURRENT_PATCH:
 		options.dont_finish_rebase = 1;
 		goto run_rebase;
@@ -1349,7 +1426,7 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 	}
 
 	/* Make sure no rebase is in progress */
-	if (in_progress) {
+	if (in_progress && options.action != ACTION_REWIND) {
 		const char *last_slash = strrchr(options.state_dir, '/');
 		const char *state_dir_base =
 			last_slash ? last_slash + 1 : options.state_dir;
@@ -1569,6 +1646,15 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 		strvec_push(&options.git_am_opts, "--signoff");
 		options.flags |= REBASE_FORCE;
 	}
+
+	// We branch off after handling any option that could usefully
+	// affect the re-creation of the todo list.
+	// The omission of --onto from that is debatable.
+	// Options that will be overwritten by read_basic_state() are
+	// meaningless, so we can branch out before processing these;
+	// though arguably, it should be possible to change some of them.
+	if (options.action == ACTION_REWIND)
+		goto run_rebase;
 
 	if (!options.root) {
 		if (argc < 1) {
