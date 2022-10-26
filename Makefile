@@ -595,6 +595,7 @@ export TCL_PATH TCLTK_PATH
 PTHREAD_LIBS = -lpthread
 
 # Guard against environment variables
+BIN_WRAPPERS =
 BUILTIN_OBJS =
 BUILT_INS =
 COMPAT_CFLAGS =
@@ -3063,16 +3064,39 @@ GIT-PYTHON-VARS: FORCE
             fi
 endif
 
-test_bindir_programs := $(patsubst %,bin-wrappers/%,$(BINDIR_PROGRAMS_NEED_X) $(BINDIR_PROGRAMS_NO_X) $(TEST_PROGRAMS_NEED_X))
-
-all:: $(test_bindir_programs)
-
-bin-wrappers/%: wrap-for-bin.sh
-	$(call mkdir_p_parent_template)
-	$(QUIET_GEN)sed -e $(call cmd_munge_script_sed_shell_path_arg) \
-	     -e 's|@@BUILD_DIR@@|$(shell pwd)|' \
-	     -e 's|@@PROG@@|$(patsubst test-%,t/helper/test-%,$(@F))$(if $(filter-out $(BINDIR_PROGRAMS_NO_X),$(@F)),$(X),)|' < $< > $@ && \
+define cmd_munge_bin_wrappers_script
+sed \
+	-e $(call cmd_munge_script_sed_shell_path_arg) \
+	-e 's|@@BUILD_DIR@@|$(shell pwd)|' \
+	-e 's|@@PROG@@|$(2)$(1)$(3)|' \
+	<$< >$@ && \
 	chmod +x $@
+endef
+
+define bin_wrappers_template
+
+## bin_wrappers_template
+# 1 = $(1)
+# 2 = $(2)
+# 3 = $(3)
+# 4 = $(4)
+BW_$(1) = $$($(1):%=bin-wrappers/%)
+BIN_WRAPPERS += $$(BW_$(1))
+all:: $$(BW_$(1))
+$$(BW_$(1)): bin-wrappers/% : $(3)%$(4)
+$$(BW_$(1)): wrap-for-bin.sh
+	$$(call mkdir_p_parent_template)
+	$$(QUIET_GEN)$$(call cmd_munge_bin_wrappers_script,$(2),$(3),$(4))
+endef
+
+define bin_wrappers_templates
+$(call bin_wrappers_template,BINDIR_PROGRAMS_NEED_X,'$$(@F)',,$$X)
+$(call bin_wrappers_template,BINDIR_PROGRAMS_NO_X,'$$(@F)')
+$(call bin_wrappers_template,TEST_PROGRAMS_NEED_X,'$$(@F)',t/helper/,$$X)
+endef
+$(eval $(call bin_wrappers_templates))
+
+all:: $(BIN_WRAPPERS)
 
 # GNU make supports exporting all variables by "export" without parameters.
 # However, the environment gets quite big, and some programs have problems
@@ -3405,7 +3429,7 @@ OTHER_PROGRAMS += $(shell echo *.dll t/helper/*.dll)
 endif
 
 artifacts-tar:: $(ALL_COMMANDS_TO_INSTALL) $(SCRIPT_LIB) $(OTHER_PROGRAMS) \
-		GIT-BUILD-OPTIONS $(TEST_PROGRAMS) $(test_bindir_programs) \
+		GIT-BUILD-OPTIONS $(TEST_PROGRAMS) $(BIN_WRAPPERS) \
 		$(MOFILES)
 	$(QUIET_SUBDIR0)templates $(QUIET_SUBDIR1) \
 		SHELL_PATH='$(SHELL_PATH_SQ)' PERL_PATH='$(PERL_PATH_SQ)'
