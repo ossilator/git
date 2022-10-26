@@ -1465,7 +1465,6 @@ static int maintenance_register(int argc, const char **argv, const char *prefix)
 	};
 	int found = 0;
 	const char *key = "maintenance.repo";
-	char *config_value;
 	char *maintpath = get_maintpath();
 	const struct string_list *list;
 
@@ -1479,9 +1478,7 @@ static int maintenance_register(int argc, const char **argv, const char *prefix)
 	git_config_set("maintenance.auto", "false");
 
 	/* Set maintenance strategy, if unset */
-	if (!git_config_get_string("maintenance.strategy", &config_value))
-		free(config_value);
-	else
+	if (git_config_lookup_value("maintenance.strategy"))
 		git_config_set("maintenance.strategy", "incremental");
 
 	if (!git_config_get_knownkey_value_multi(key, &list))

@@ -502,6 +502,8 @@ void git_configset_clear(struct config_set *cs);
  * is owned by the cache.
  */
 int git_configset_get_value(struct config_set *cs, const char *key, const char **dest);
+RESULT_MUST_BE_USED
+int git_configset_lookup_value(struct config_set *cs, const char *key);
 
 int git_configset_get_string(struct config_set *cs, const char *key, char **dest);
 int git_configset_get_int(struct config_set *cs, const char *key, int *dest);
@@ -524,6 +526,8 @@ RESULT_MUST_BE_USED
 int repo_config_get_knownkey_value_multi(struct repository *repo,
 					 const char *const key,
 					 const struct string_list **dest);
+RESULT_MUST_BE_USED
+int repo_config_lookup_value(struct repository *repo, const char *key);
 int repo_config_get_string(struct repository *repo,
 			   const char *key, char **dest);
 int repo_config_get_string_tmp(struct repository *repo,
@@ -587,6 +591,14 @@ int git_config_get_value_multi(const char *key,
 RESULT_MUST_BE_USED
 int git_config_get_knownkey_value_multi(const char *const key,
 					const struct string_list **dest);
+
+/**
+ * The same as git_config_value(), except without the extra work to
+ * return the value to the user, used to check if a value for a key
+ * exists.
+ */
+RESULT_MUST_BE_USED
+int git_config_lookup_value(const char *key);
 
 /**
  * Resets and invalidates the config cache.

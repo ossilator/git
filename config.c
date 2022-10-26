@@ -2423,7 +2423,7 @@ int git_configset_get_value(struct config_set *cs, const char *key, const char *
 
 static int git_configset_get_value_multi_1(struct config_set *cs, const char *key,
 					   const struct string_list **dest,
-					   int knownkey)
+					   int read_only, int knownkey)
 {
 	struct config_set_element *e;
 	int ret;
@@ -2435,7 +2435,8 @@ static int git_configset_get_value_multi_1(struct config_set *cs, const char *ke
 		return ret;
 	else if (!e)
 		return 1;
-	*dest = &e->value_list;
+	if (!read_only)
+		*dest = &e->value_list;
 
 	return 0;
 }
@@ -2443,14 +2444,19 @@ static int git_configset_get_value_multi_1(struct config_set *cs, const char *ke
 int git_configset_get_value_multi(struct config_set *cs, const char *key,
 				  const struct string_list **dest)
 {
-	return git_configset_get_value_multi_1(cs, key, dest, 0);
+	return git_configset_get_value_multi_1(cs, key, dest, 0, 0);
 }
 
 int git_configset_get_knownkey_value_multi(struct config_set *cs,
 					   const char *const key,
 					   const struct string_list **dest)
 {
-	return git_configset_get_value_multi_1(cs, key, dest, 1);
+	return git_configset_get_value_multi_1(cs, key, dest, 0, 1);
+}
+
+int git_configset_lookup_value(struct config_set *cs, const char *key)
+{
+	return git_configset_get_value_multi_1(cs, key, NULL, 1, 0);
 }
 
 int git_configset_get_string(struct config_set *cs, const char *key, char **dest)
@@ -2589,6 +2595,12 @@ void repo_config(struct repository *repo, config_fn_t fn, void *data)
 	configset_iter(repo->config, fn, data);
 }
 
+int repo_config_lookup_value(struct repository *repo, const char *key)
+{
+	git_config_check_init(repo);
+	return git_configset_get_value_multi_1(repo->config, key, NULL, 1, 0);
+}
+
 int repo_config_get_value(struct repository *repo,
 			  const char *key, const char **value)
 {
@@ -2710,6 +2722,11 @@ void git_config(config_fn_t fn, void *data)
 void git_config_clear(void)
 {
 	repo_config_clear(the_repository);
+}
+
+int git_config_lookup_value(const char *key)
+{
+	return repo_config_lookup_value(the_repository, key);
 }
 
 int git_config_get_value(const char *key, const char **value)
