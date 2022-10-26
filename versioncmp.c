@@ -160,10 +160,14 @@ int versioncmp(const char *s1, const char *s2)
 	}
 
 	if (!initialized) {
-		const struct string_list *deprecated_prereleases;
+		const struct string_list *deprecated_prereleases = NULL;
+
 		initialized = 1;
-		prereleases = git_config_get_value_multi("versionsort.suffix");
-		deprecated_prereleases = git_config_get_value_multi("versionsort.prereleasesuffix");
+		git_config_get_knownkey_value_multi("versionsort.suffix",
+						 &prereleases);
+		git_config_get_value_multi("versionsort.prereleasesuffix",
+					   &deprecated_prereleases);
+
 		if (prereleases) {
 			if (deprecated_prereleases)
 				warning("ignoring versionsort.prereleasesuffix because versionsort.suffix is set");

@@ -28,7 +28,7 @@ int cmd_for_each_repo(int argc, const char **argv, const char *prefix)
 {
 	static const char *config_key = NULL;
 	int i, result = 0;
-	const struct string_list *values;
+	const struct string_list *values = NULL;
 
 	const struct option options[] = {
 		OPT_STRING(0, "config", &config_key, N_("config"),
@@ -42,8 +42,7 @@ int cmd_for_each_repo(int argc, const char **argv, const char *prefix)
 	if (!config_key)
 		die(_("missing --config=<config>"));
 
-	values = repo_config_get_value_multi(the_repository,
-					     config_key);
+	repo_config_get_value_multi(the_repository, config_key, &values);
 
 	/*
 	 * Do nothing on an empty list, which is equivalent to the case
