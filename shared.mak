@@ -71,8 +71,11 @@ ifndef V
 	QUIET_RC       = @echo '   ' RC $@;
 
 ## Used in "Makefile": SPATCH
-	QUIET_SPATCH			= @echo '   ' SPATCH $<;
+	QUIET_SPATCH			= @echo '   ' SPATCH $@;
 	QUIET_SPATCH_TEST		= @echo '   ' SPATCH TEST $(@:.build/%=%);
+
+## Used in "Makefile": SPATCH_*TMPL (quoted for use in "define"'s)
+	QUIET_SPATCH_CAT_TMPL		= @echo '   ' SPATCH CAT $$$$^ \>$$@;
 
 ## Used in "Documentation/Makefile"
 	QUIET_ASCIIDOC	= @echo '   ' ASCIIDOC $@;
