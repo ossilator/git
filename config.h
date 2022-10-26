@@ -485,6 +485,30 @@ int git_configset_get_knownkey_value_multi(struct config_set *cs,
 					   const struct string_list **dest);
 
 /**
+ * A validation wrapper for git_configset_get_value_multi() which does
+ * for it what git_configset_get_string() does for
+ * git_configset_get_value().
+ *
+ * The configuration syntax allows for "[section] key", which will
+ * give us a NULL entry in the "struct string_list", as opposed to
+ * "[section] key =" which is the empty string. Most users of the API
+ * are not prepared to handle NULL in a "struct string_list".
+ */
+int git_configset_get_value_multi_string(struct config_set *cs, const char *key,
+					 const struct string_list **dest);
+
+/**
+ * A wrapper for git_configset_get_value_multi_string() which does for
+ * it what git_configset_get_knownkey_value_multi() does for
+ * git_configset_get_value_multi().
+ */
+RESULT_MUST_BE_USED
+int git_configset_get_knownkey_value_multi_string(struct config_set *cs,
+						  const char *const key,
+						  const struct string_list **dest);
+
+
+/**
  * Clears `config_set` structure, removes all saved variable-value pairs.
  */
 void git_configset_clear(struct config_set *cs);
@@ -526,6 +550,14 @@ RESULT_MUST_BE_USED
 int repo_config_get_knownkey_value_multi(struct repository *repo,
 					 const char *const key,
 					 const struct string_list **dest);
+RESULT_MUST_BE_USED
+int repo_config_get_value_multi_string(struct repository *repo,
+				       const char *key,
+				       const struct string_list **dest);
+RESULT_MUST_BE_USED
+int repo_config_get_knownkey_value_multi_string(struct repository *repo,
+						const char *const key,
+						const struct string_list **dest);
 RESULT_MUST_BE_USED
 int repo_config_lookup_value(struct repository *repo, const char *key);
 int repo_config_get_string(struct repository *repo,
@@ -591,6 +623,14 @@ int git_config_get_value_multi(const char *key,
 RESULT_MUST_BE_USED
 int git_config_get_knownkey_value_multi(const char *const key,
 					const struct string_list **dest);
+
+RESULT_MUST_BE_USED
+int git_config_get_value_multi_string(const char *key,
+				      const struct string_list **dest);
+
+RESULT_MUST_BE_USED
+int git_config_get_knownkey_value_multi_string(const char *const key,
+					       const struct string_list **dest);
 
 /**
  * The same as git_config_value(), except without the extra work to

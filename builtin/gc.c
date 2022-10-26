@@ -1481,7 +1481,7 @@ static int maintenance_register(int argc, const char **argv, const char *prefix)
 	if (git_config_lookup_value("maintenance.strategy"))
 		git_config_set("maintenance.strategy", "incremental");
 
-	if (!git_config_get_knownkey_value_multi(key, &list))
+	if (!git_config_get_knownkey_value_multi_string(key, &list))
 		found = unsorted_string_list_has_string(list, maintpath);
 
 	if (!found) {
@@ -1530,7 +1530,7 @@ static int maintenance_unregister(int argc, const char **argv, const char *prefi
 		usage_with_options(builtin_maintenance_unregister_usage,
 				   options);
 
-	if (!git_config_get_knownkey_value_multi(key, &list))
+	if (!git_config_get_knownkey_value_multi_string(key, &list))
 		found = unsorted_string_list_has_string(list, maintpath);
 
 	if (found) {

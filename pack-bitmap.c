@@ -2303,7 +2303,7 @@ const struct string_list *bitmap_preferred_tips(struct repository *r)
 {
 	const struct string_list *dest;
 
-	if (!repo_config_get_knownkey_value_multi(r, "pack.preferbitmaptips",
+	if (!repo_config_get_knownkey_value_multi_string(r, "pack.preferbitmaptips",
 					       &dest))
 		return dest;
 	return NULL;

@@ -165,11 +165,11 @@ int versioncmp(const char *s1, const char *s2)
 
 		initialized = 1;
 		prereleases_ret =
-			git_config_get_knownkey_value_multi("versionsort.suffix",
-							    &prereleases);
+			git_config_get_knownkey_value_multi_string("versionsort.suffix",
+								   &prereleases);
 		deprecated_prereleases_ret =
-			git_config_get_knownkey_value_multi("versionsort.prereleasesuffix",
-							    &deprecated_prereleases);
+			git_config_get_knownkey_value_multi_string("versionsort.prereleasesuffix",
+								   &deprecated_prereleases);
 
 		if (!prereleases_ret) {
 			if (!deprecated_prereleases_ret)

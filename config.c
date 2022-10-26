@@ -2423,7 +2423,8 @@ int git_configset_get_value(struct config_set *cs, const char *key, const char *
 
 static int git_configset_get_value_multi_1(struct config_set *cs, const char *key,
 					   const struct string_list **dest,
-					   int read_only, int knownkey)
+					   int read_only, int knownkey,
+					   string_list_each_func_t check_fn)
 {
 	struct config_set_element *e;
 	int ret;
@@ -2435,28 +2436,51 @@ static int git_configset_get_value_multi_1(struct config_set *cs, const char *ke
 		return ret;
 	else if (!e)
 		return 1;
+	if (check_fn &&
+	    (ret = for_each_string_list(&e->value_list, check_fn, (void *)key)))
+		return ret;
 	if (!read_only)
 		*dest = &e->value_list;
 
 	return 0;
 }
 
+static int check_multi_string(struct string_list_item *item, void *util)
+{
+	return item->string ? 0 : config_error_nonbool(util);
+}
+
 int git_configset_get_value_multi(struct config_set *cs, const char *key,
 				  const struct string_list **dest)
 {
-	return git_configset_get_value_multi_1(cs, key, dest, 0, 0);
+	return git_configset_get_value_multi_1(cs, key, dest, 0, 0, NULL);
 }
 
 int git_configset_get_knownkey_value_multi(struct config_set *cs,
 					   const char *const key,
 					   const struct string_list **dest)
 {
-	return git_configset_get_value_multi_1(cs, key, dest, 0, 1);
+	return git_configset_get_value_multi_1(cs, key, dest, 0, 1, NULL);
+}
+
+int git_configset_get_value_multi_string(struct config_set *cs, const char *key,
+					 const struct string_list **dest)
+{
+	return git_configset_get_value_multi_1(cs, key, dest, 0, 0,
+					       check_multi_string);
+}
+
+int git_configset_get_knownkey_value_multi_string(struct config_set *cs,
+						  const char *const key,
+						  const struct string_list **dest)
+{
+	return git_configset_get_value_multi_1(cs, key, dest, 0, 1,
+					       check_multi_string);
 }
 
 int git_configset_lookup_value(struct config_set *cs, const char *key)
 {
-	return git_configset_get_value_multi_1(cs, key, NULL, 1, 0);
+	return git_configset_get_value_multi_1(cs, key, NULL, 1, 0, NULL);
 }
 
 int git_configset_get_string(struct config_set *cs, const char *key, char **dest)
@@ -2598,7 +2622,8 @@ void repo_config(struct repository *repo, config_fn_t fn, void *data)
 int repo_config_lookup_value(struct repository *repo, const char *key)
 {
 	git_config_check_init(repo);
-	return git_configset_get_value_multi_1(repo->config, key, NULL, 1, 0);
+	return git_configset_get_value_multi_1(repo->config, key, NULL, 1, 0,
+					       NULL);
 }
 
 int repo_config_get_value(struct repository *repo,
@@ -2622,6 +2647,22 @@ int repo_config_get_knownkey_value_multi(struct repository *repo,
 {
 	git_config_check_init(repo);
 	return git_configset_get_knownkey_value_multi(repo->config, key, dest);
+}
+
+int repo_config_get_value_multi_string(struct repository *repo,
+				       const char *key,
+				       const struct string_list **dest)
+{
+	git_config_check_init(repo);
+	return git_configset_get_value_multi_string(repo->config, key, dest);
+}
+
+int repo_config_get_knownkey_value_multi_string(struct repository *repo,
+						const char *key,
+						const struct string_list **dest)
+{
+	git_config_check_init(repo);
+	return git_configset_get_knownkey_value_multi_string(repo->config, key, dest);
 }
 
 int repo_config_get_string(struct repository *repo,
@@ -2743,6 +2784,18 @@ int git_config_get_knownkey_value_multi(const char *const key,
 					const struct string_list **dest)
 {
 	return repo_config_get_knownkey_value_multi(the_repository, key, dest);
+}
+
+int git_config_get_value_multi_string(const char *key,
+				      const struct string_list **dest)
+{
+	return repo_config_get_value_multi_string(the_repository, key, dest);
+}
+
+int git_config_get_knownkey_value_multi_string(const char *key,
+					       const struct string_list **dest)
+{
+	return repo_config_get_knownkey_value_multi_string(the_repository, key, dest);
 }
 
 int git_config_get_string(const char *key, char **dest)
