@@ -138,7 +138,7 @@ void string_list_clear_func(struct string_list *list, string_list_clear_func_t c
  * Apply `func` to each item. If `func` returns nonzero, the
  * iteration aborts and the return value is propagated.
  */
-int for_each_string_list(struct string_list *list,
+int for_each_string_list(const struct string_list *list,
 			 string_list_each_func_t func, void *cb_data);
 
 /**

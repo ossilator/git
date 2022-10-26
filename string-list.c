@@ -129,7 +129,7 @@ void string_list_remove_duplicates(struct string_list *list, int free_util)
 	}
 }
 
-int for_each_string_list(struct string_list *list,
+int for_each_string_list(const struct string_list *list,
 			 string_list_each_func_t fn, void *cb_data)
 {
 	int i, ret = 0;
