@@ -470,6 +470,7 @@ int git_configset_add_parameters(struct config_set *cs);
  * The caller should not free or modify the returned pointer, as it is
  * owned by the cache.
  */
+RESULT_MUST_BE_USED
 int git_configset_get_value_multi(struct config_set *cs, const char *key,
 				  const struct string_list **dest);
 
@@ -478,6 +479,7 @@ int git_configset_get_value_multi(struct config_set *cs, const char *key,
  * value is < 0. Use it for keys known to pass git_config_parse_key(),
  * i.e. those hardcoded in the code, and never user-provided keys.
  */
+RESULT_MUST_BE_USED
 int git_configset_get_knownkey_value_multi(struct config_set *cs,
 					   const char *const key,
 					   const struct string_list **dest);
@@ -514,9 +516,11 @@ struct repository;
 void repo_config(struct repository *repo, config_fn_t fn, void *data);
 int repo_config_get_value(struct repository *repo,
 			  const char *key, const char **value);
+RESULT_MUST_BE_USED
 int repo_config_get_value_multi(struct repository *repo,
 				const char *key,
 				const struct string_list **dest);
+RESULT_MUST_BE_USED
 int repo_config_get_knownkey_value_multi(struct repository *repo,
 					 const char *const key,
 					 const struct string_list **dest);
@@ -571,6 +575,7 @@ int git_config_get_value(const char *key, const char **value);
  * The caller should not free or modify the returned pointer, as it is
  * owned by the cache.
  */
+RESULT_MUST_BE_USED
 int git_config_get_value_multi(const char *key,
 			       const struct string_list **dest);
 
@@ -579,6 +584,7 @@ int git_config_get_value_multi(const char *key,
  * git_configset_get_knownkey_value_multi() does for
  * git_configset_get_value_multi().
  */
+RESULT_MUST_BE_USED
 int git_config_get_knownkey_value_multi(const char *const key,
 					const struct string_list **dest);
 
