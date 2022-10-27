@@ -4,7 +4,48 @@
 
 #[[
 
-Instructions how to use this in Visual Studio:
+== Overview ==
+
+The top-level Makefile is Git's primary build environment, and a lot
+of things are missing (and probably always will be) from this CMake
+alternative.
+
+The primary use-case for maintaining this CMake build recipe is to
+have nicer IDE integration on Windows. To get Visual Studio-specific
+instructions see "== Visual Studio & Windows ==" below.
+
+== Creating a build recipe ==
+
+To create the build recipe run:
+
+    cmake -S contrib/buildsystems -B contrib/buildsystems/out -DCMAKE_BUILD_TYPE=Release
+
+For alternative "-DCMAKE_BUILD_TYPE=<type>" flags see instructions
+under the "== -DCMAKE_BUILD_TYPE=<type> ==" heading below.
+
+== Building ==
+
+One the recipe is created a build recipe will be created. For Windows
+Open contrib/buildsystems/git.sln on Windows and build Git. Or use the
+"msbuild" command-line tool (see our own ".github/workflows/main.yml"
+for a real example):
+
+	msbuild git.sln
+
+On all other platforms running "cmake" will generate a Makefile, to
+build with it run:
+
+	make -C contrib/buildsystems/out
+
+It's also possible to use other generators, e.g. Ninja has arguably
+slightly better output. Add "-G Ninja" to the cmake command above,
+then e.g.:
+
+	ninja -C contrib/buildsystems/out
+
+== Visual Studio & Windows ==
+
+To use this in Visual Studio:
 
 Open the worktree as a folder. Visual Studio 2019 and later will detect
 the CMake configuration automatically and set everything up for you,
@@ -14,13 +55,14 @@ Note: Visual Studio also has the option of opening `CMakeLists.txt`
 directly; Using this option, Visual Studio will not find the source code,
 though, therefore the `File>Open>Folder...` option is preferred.
 
-Instructions to run CMake manually:
-
-    cmake -S contrib/buildsystems -B contrib/buildsystems/out -DCMAKE_BUILD_TYPE=Release
-
-This will build the git binaries in contrib/buildsystems/out
+Following the instructions above will build the git binaries in the contrib/buildsystems/out
 directory (our top-level .gitignore file knows to ignore contents of
 this directory).
+
+By default CMake will install vcpkg locally to your source tree on configuration,
+to avoid this, add `-DNO_VCPKG=TRUE` to the command line when configuring.
+
+== -DCMAKE_BUILD_TYPE=<type> ==
 
 Possible build configurations(-DCMAKE_BUILD_TYPE) with corresponding
 compiler flags
@@ -32,18 +74,6 @@ empty(default) :
 
 NOTE: -DCMAKE_BUILD_TYPE is optional. For multi-config generators like Visual Studio
 this option is ignored
-
-This process generates a Makefile(Linux/*BSD/MacOS) , Visual Studio solution(Windows) by default.
-Run `make -C contrib/buildsystems` to build Git on Linux/*BSD/MacOS.
-Open contrib/buildsystems/git.sln on Windows and build Git.
-
-NOTE: By default CMake uses Makefile as the build tool on Linux and Visual Studio in Windows,
-to use another tool say `ninja` add this to the command line when configuring.
-`-G Ninja`
-
-NOTE: By default CMake will install vcpkg locally to your source tree on configuration,
-to avoid this, add `-DNO_VCPKG=TRUE` to the command line when configuring.
-
 ]]
 cmake_minimum_required(VERSION 3.14)
 
