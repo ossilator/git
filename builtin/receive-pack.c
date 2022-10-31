@@ -326,13 +326,10 @@ static void show_one_alternate_ref(const struct object_id *oid,
 	show_ref(".have", oid);
 }
 
-static void write_head_info(void)
+static void write_head_info(struct oidset *announced_objects)
 {
-	static struct oidset seen = OIDSET_INIT;
-
-	for_each_ref(show_ref_cb, &seen);
-	for_each_alternate_ref(show_one_alternate_ref, &seen);
-	oidset_clear(&seen);
+	for_each_ref(show_ref_cb, announced_objects);
+	for_each_alternate_ref(show_one_alternate_ref, announced_objects);
 	if (!sent_capabilities)
 		show_ref("capabilities^{}", null_oid());
 
@@ -1896,12 +1893,20 @@ cleanup:
 	strbuf_release(&err);
 }
 
+static const struct object_id *iterate_announced_oids(void *cb_data)
+{
+	struct oidset_iter *iter = cb_data;
+	return oidset_iter_next(iter);
+}
+
 static void execute_commands(struct command *commands,
 			     const char *unpacker_error,
 			     struct shallow_info *si,
-			     const struct string_list *push_options)
+			     const struct string_list *push_options,
+			     struct oidset *announced_oids)
 {
 	struct check_connected_options opt = CHECK_CONNECTED_INIT;
+	struct oidset_iter announced_oids_iter;
 	struct command *cmd;
 	struct iterate_data data;
 	struct async muxer;
@@ -1928,6 +1933,12 @@ static void execute_commands(struct command *commands,
 	opt.err_fd = err_fd;
 	opt.progress = err_fd && !quiet;
 	opt.env = tmp_objdir_env(tmp_objdir);
+	if (oidset_size(announced_oids) != 0) {
+		oidset_iter_init(announced_oids, &announced_oids_iter);
+		opt.reachable_oids_fn = iterate_announced_oids;
+		opt.reachable_oids_data = &announced_oids_iter;
+	}
+
 	if (check_connected(iterate_receive_command_list, &data, &opt))
 		set_connectivity_errors(commands, si);
 
@@ -2462,6 +2473,7 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 {
 	int advertise_refs = 0;
 	struct command *commands;
+	struct oidset announced_oids = OIDSET_INIT;
 	struct oid_array shallow = OID_ARRAY_INIT;
 	struct oid_array ref = OID_ARRAY_INIT;
 	struct shallow_info si;
@@ -2524,10 +2536,10 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 	}
 
 	if (advertise_refs || !stateless_rpc) {
-		write_head_info();
+		write_head_info(&announced_oids);
 	}
 	if (advertise_refs)
-		return 0;
+		goto cleanup;
 
 	packet_reader_init(&reader, 0, NULL, 0,
 			   PACKET_READ_CHOMP_NEWLINE |
@@ -2554,7 +2566,7 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 		}
 		use_keepalive = KEEPALIVE_ALWAYS;
 		execute_commands(commands, unpack_status, &si,
-				 &push_options);
+				 &push_options, &announced_oids);
 		if (pack_lockfile)
 			unlink_or_warn(pack_lockfile);
 		sigchain_push(SIGPIPE, SIG_IGN);
@@ -2587,10 +2599,12 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 			update_server_info(0);
 		clear_shallow_info(&si);
 	}
+cleanup:
 	if (use_sideband)
 		packet_flush(1);
 	oid_array_clear(&shallow);
 	oid_array_clear(&ref);
+	oidset_clear(&announced_oids);
 	free((void *)push_cert_nonce);
 	return 0;
 }

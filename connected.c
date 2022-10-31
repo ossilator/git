@@ -98,7 +98,7 @@ no_promisor_pack_found:
 	strvec_push(&rev_list.args, "--stdin");
 	if (has_promisor_remote())
 		strvec_push(&rev_list.args, "--exclude-promisor-objects");
-	if (!opt->is_deepening_fetch) {
+	if (!opt->is_deepening_fetch && !opt->reachable_oids_fn) {
 		strvec_push(&rev_list.args, "--not");
 		strvec_push(&rev_list.args, "--all");
 	}
@@ -124,6 +124,13 @@ no_promisor_pack_found:
 	sigchain_push(SIGPIPE, SIG_IGN);
 
 	rev_list_in = xfdopen(rev_list.in, "w");
+
+	if (opt->reachable_oids_fn) {
+		const struct object_id *reachable_oid;
+		while ((reachable_oid = opt->reachable_oids_fn(opt->reachable_oids_data)) != NULL)
+			if (fprintf(rev_list_in, "^%s\n", oid_to_hex(reachable_oid)) < 0)
+				break;
+	}
 
 	do {
 		/*

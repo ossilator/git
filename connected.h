@@ -46,6 +46,13 @@ struct check_connected_options {
 	 * during a fetch.
 	 */
 	unsigned is_deepening_fetch : 1;
+
+	/*
+	 * If non-NULL, use this iterator to determine the set of reachable
+	 * objects instead of marking all references as unreachable.
+	 */
+	oid_iterate_fn reachable_oids_fn;
+	void *reachable_oids_data;
 };
 
 #define CHECK_CONNECTED_INIT { 0 }
