@@ -458,11 +458,56 @@ int git_configset_add_parameters(struct config_set *cs);
 
 /**
  * Finds and returns the value list, sorted in order of increasing priority
- * for the configuration variable `key` and config set `cs`. When the
- * configuration variable `key` is not found, returns NULL. The caller
- * should not free or modify the returned pointer, as it is owned by the cache.
+ * for the configuration variable `key` and config set `cs`.
+ *
+ * When the configuration variable `key` is not found, returns 1
+ * without touching `value`.
+ *
+ * The key will be parsed for validity with git_config_parse_key(), on
+ * error a negative value will be returned. See
+ * git_configset_get_knownkey_value_multi() for a version of this which
+ * BUG()s out on negative return values.
+ *
+ * The caller should not free or modify the returned pointer, as it is
+ * owned by the cache.
  */
-const struct string_list *git_configset_get_value_multi(struct config_set *cs, const char *key);
+RESULT_MUST_BE_USED
+int git_configset_get_value_multi(struct config_set *cs, const char *key,
+				  const struct string_list **dest);
+
+/**
+ * Like git_configset_get_value_multi(), but BUG()s out if the return
+ * value is < 0. Use it for keys known to pass git_config_parse_key(),
+ * i.e. those hardcoded in the code, and never user-provided keys.
+ */
+RESULT_MUST_BE_USED
+int git_configset_get_knownkey_value_multi(struct config_set *cs,
+					   const char *const key,
+					   const struct string_list **dest);
+
+/**
+ * A validation wrapper for git_configset_get_value_multi() which does
+ * for it what git_configset_get_string() does for
+ * git_configset_get_value().
+ *
+ * The configuration syntax allows for "[section] key", which will
+ * give us a NULL entry in the "struct string_list", as opposed to
+ * "[section] key =" which is the empty string. Most users of the API
+ * are not prepared to handle NULL in a "struct string_list".
+ */
+int git_configset_get_value_multi_string(struct config_set *cs, const char *key,
+					 const struct string_list **dest);
+
+/**
+ * A wrapper for git_configset_get_value_multi_string() which does for
+ * it what git_configset_get_knownkey_value_multi() does for
+ * git_configset_get_value_multi().
+ */
+RESULT_MUST_BE_USED
+int git_configset_get_knownkey_value_multi_string(struct config_set *cs,
+						  const char *const key,
+						  const struct string_list **dest);
+
 
 /**
  * Clears `config_set` structure, removes all saved variable-value pairs.
@@ -482,6 +527,8 @@ void git_configset_clear(struct config_set *cs);
  * is owned by the cache.
  */
 int git_configset_get_value(struct config_set *cs, const char *key, const char **dest);
+RESULT_MUST_BE_USED
+int git_configset_lookup_value(struct config_set *cs, const char *key);
 
 int git_configset_get_string(struct config_set *cs, const char *key, char **dest);
 int git_configset_get_int(struct config_set *cs, const char *key, int *dest);
@@ -496,8 +543,24 @@ struct repository;
 void repo_config(struct repository *repo, config_fn_t fn, void *data);
 int repo_config_get_value(struct repository *repo,
 			  const char *key, const char **value);
-const struct string_list *repo_config_get_value_multi(struct repository *repo,
-						      const char *key);
+RESULT_MUST_BE_USED
+int repo_config_get_value_multi(struct repository *repo,
+				const char *key,
+				const struct string_list **dest);
+RESULT_MUST_BE_USED
+int repo_config_get_knownkey_value_multi(struct repository *repo,
+					 const char *const key,
+					 const struct string_list **dest);
+RESULT_MUST_BE_USED
+int repo_config_get_value_multi_string(struct repository *repo,
+				       const char *key,
+				       const struct string_list **dest);
+RESULT_MUST_BE_USED
+int repo_config_get_knownkey_value_multi_string(struct repository *repo,
+						const char *const key,
+						const struct string_list **dest);
+RESULT_MUST_BE_USED
+int repo_config_lookup_value(struct repository *repo, const char *key);
 int repo_config_get_string(struct repository *repo,
 			   const char *key, char **dest);
 int repo_config_get_string_tmp(struct repository *repo,
@@ -544,10 +607,39 @@ int git_config_get_value(const char *key, const char **value);
 /**
  * Finds and returns the value list, sorted in order of increasing priority
  * for the configuration variable `key`. When the configuration variable
- * `key` is not found, returns NULL. The caller should not free or modify
- * the returned pointer, as it is owned by the cache.
+ * `key` is not found, returns 1 without touching `value`.
+ *
+ * The caller should not free or modify the returned pointer, as it is
+ * owned by the cache.
  */
-const struct string_list *git_config_get_value_multi(const char *key);
+RESULT_MUST_BE_USED
+int git_config_get_value_multi(const char *key,
+			       const struct string_list **dest);
+
+/**
+ * A wrapper for git_config_get_value_multi() which does for it what
+ * git_configset_get_knownkey_value_multi() does for
+ * git_configset_get_value_multi().
+ */
+RESULT_MUST_BE_USED
+int git_config_get_knownkey_value_multi(const char *const key,
+					const struct string_list **dest);
+
+RESULT_MUST_BE_USED
+int git_config_get_value_multi_string(const char *key,
+				      const struct string_list **dest);
+
+RESULT_MUST_BE_USED
+int git_config_get_knownkey_value_multi_string(const char *const key,
+					       const struct string_list **dest);
+
+/**
+ * The same as git_config_value(), except without the extra work to
+ * return the value to the user, used to check if a value for a key
+ * exists.
+ */
+RESULT_MUST_BE_USED
+int git_config_lookup_value(const char *key);
 
 /**
  * Resets and invalidates the config cache.

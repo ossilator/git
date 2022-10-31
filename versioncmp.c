@@ -161,14 +161,22 @@ int versioncmp(const char *s1, const char *s2)
 
 	if (!initialized) {
 		const struct string_list *deprecated_prereleases;
+		int prereleases_ret, deprecated_prereleases_ret;
+
 		initialized = 1;
-		prereleases = git_config_get_value_multi("versionsort.suffix");
-		deprecated_prereleases = git_config_get_value_multi("versionsort.prereleasesuffix");
-		if (prereleases) {
-			if (deprecated_prereleases)
+		prereleases_ret =
+			git_config_get_knownkey_value_multi_string("versionsort.suffix",
+								   &prereleases);
+		deprecated_prereleases_ret =
+			git_config_get_knownkey_value_multi_string("versionsort.prereleasesuffix",
+								   &deprecated_prereleases);
+
+		if (!prereleases_ret) {
+			if (!deprecated_prereleases_ret)
 				warning("ignoring versionsort.prereleasesuffix because versionsort.suffix is set");
-		} else
+		} else if (!deprecated_prereleases_ret) {
 			prereleases = deprecated_prereleases;
+		}
 	}
 	if (prereleases && swap_prereleases(s1, s2, (const char *) p1 - s1 - 1,
 					    &diff))

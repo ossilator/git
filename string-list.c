@@ -129,7 +129,7 @@ void string_list_remove_duplicates(struct string_list *list, int free_util)
 	}
 }
 
-int for_each_string_list(struct string_list *list,
+int for_each_string_list(const struct string_list *list,
 			 string_list_each_func_t fn, void *cb_data)
 {
 	int i, ret = 0;
@@ -245,7 +245,7 @@ void string_list_sort(struct string_list *list)
 	QSORT_S(list->items, list->nr, cmp_items, &sort_ctx);
 }
 
-struct string_list_item *unsorted_string_list_lookup(struct string_list *list,
+struct string_list_item *unsorted_string_list_lookup(const struct string_list *list,
 						     const char *string)
 {
 	struct string_list_item *item;
@@ -257,7 +257,7 @@ struct string_list_item *unsorted_string_list_lookup(struct string_list *list,
 	return NULL;
 }
 
-int unsorted_string_list_has_string(struct string_list *list,
+int unsorted_string_list_has_string(const struct string_list *list,
 				    const char *string)
 {
 	return unsorted_string_list_lookup(list, string) != NULL;

@@ -138,7 +138,7 @@ void string_list_clear_func(struct string_list *list, string_list_clear_func_t c
  * Apply `func` to each item. If `func` returns nonzero, the
  * iteration aborts and the return value is propagated.
  */
-int for_each_string_list(struct string_list *list,
+int for_each_string_list(const struct string_list *list,
 			 string_list_each_func_t func, void *cb_data);
 
 /**
@@ -227,13 +227,13 @@ void string_list_sort(struct string_list *list);
  * Like `string_list_has_string()` but for unsorted lists. Linear in
  * size of the list.
  */
-int unsorted_string_list_has_string(struct string_list *list, const char *string);
+int unsorted_string_list_has_string(const struct string_list *list, const char *string);
 
 /**
  * Like `string_list_lookup()` but for unsorted lists. Linear in size
  * of the list.
  */
-struct string_list_item *unsorted_string_list_lookup(struct string_list *list,
+struct string_list_item *unsorted_string_list_lookup(const struct string_list *list,
 						     const char *string);
 /**
  * Remove an item from a string_list. The `string` pointer of the

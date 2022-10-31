@@ -1491,9 +1491,7 @@ static int maintenance_register(int argc, const char **argv, const char *prefix)
 	};
 	int found = 0;
 	const char *key = "maintenance.repo";
-	char *config_value;
 	char *maintpath = get_maintpath();
-	struct string_list_item *item;
 	const struct string_list *list;
 
 	argc = parse_options(argc, argv, prefix, options,
@@ -1506,20 +1504,11 @@ static int maintenance_register(int argc, const char **argv, const char *prefix)
 	git_config_set("maintenance.auto", "false");
 
 	/* Set maintenance strategy, if unset */
-	if (!git_config_get_string("maintenance.strategy", &config_value))
-		free(config_value);
-	else
+	if (git_config_lookup_value("maintenance.strategy"))
 		git_config_set("maintenance.strategy", "incremental");
 
-	list = git_config_get_value_multi(key);
-	if (list) {
-		for_each_string_list_item(item, list) {
-			if (!strcmp(maintpath, item->string)) {
-				found = 1;
-				break;
-			}
-		}
-	}
+	if (!git_config_get_knownkey_value_multi_string(key, &list))
+		found = unsorted_string_list_has_string(list, maintpath);
 
 	if (!found) {
 		int rc;
@@ -1559,7 +1548,6 @@ static int maintenance_unregister(int argc, const char **argv, const char *prefi
 	const char *key = "maintenance.repo";
 	char *maintpath = get_maintpath();
 	int found = 0;
-	struct string_list_item *item;
 	const struct string_list *list;
 
 	argc = parse_options(argc, argv, prefix, options,
@@ -1568,15 +1556,8 @@ static int maintenance_unregister(int argc, const char **argv, const char *prefi
 		usage_with_options(builtin_maintenance_unregister_usage,
 				   options);
 
-	list = git_config_get_value_multi(key);
-	if (list) {
-		for_each_string_list_item(item, list) {
-			if (!strcmp(maintpath, item->string)) {
-				found = 1;
-				break;
-			}
-		}
-	}
+	if (!git_config_get_knownkey_value_multi_string(key, &list))
+		found = unsorted_string_list_has_string(list, maintpath);
 
 	if (found) {
 		int rc;
